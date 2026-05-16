@@ -166,58 +166,58 @@ class ReportController
     }
 
     private function academicStudentSummary(array $filters)
-    {
-        $sql = 'SELECT
-                    s.id AS student_id,
-                    u.full_name,
-                    s.admission_number,
-                    c.class_name,
-                    ay.year_name,
-                    COUNT(r.id) AS exam_count,
-                    COALESCE(SUM(r.marks_obtained), 0) AS total_obtained,
-                    COALESCE(SUM(e.total_marks), 0) AS total_possible,
-                    COALESCE(MAX(r.marks_obtained), 0) AS highest_mark,
-                    COALESCE(MIN(r.marks_obtained), 0) AS lowest_mark
-                FROM students s
-                INNER JOIN users u ON u.id = s.user_id
-                LEFT JOIN classes c ON c.id = s.class_id
-                LEFT JOIN results r ON r.student_id = s.id
-                LEFT JOIN exams e ON e.id = r.exam_id';
-        $sql .= ' WHERE 1 = 1';
-        $params = [];
+{
+    $sql = 'SELECT
+                s.id AS student_id,
+                u.full_name,
+                s.admission_number,
+                c.class_name,
+                ay.year_name,
+                COUNT(r.id) AS exam_count,
+                COALESCE(SUM(r.marks_obtained), 0) AS total_obtained,
+                COALESCE(SUM(e.total_marks), 0) AS total_possible,
+                COALESCE(MAX(r.marks_obtained), 0) AS highest_mark,
+                COALESCE(MIN(r.marks_obtained), 0) AS lowest_mark
+            FROM students s
+            INNER JOIN users u ON u.id = s.user_id
+            LEFT JOIN classes c ON c.id = s.class_id
+            LEFT JOIN results r ON r.student_id = s.id
+            LEFT JOIN exams e ON e.id = r.exam_id
+            LEFT JOIN academic_years ay ON ay.id = e.academic_year_id';
+    $sql .= ' WHERE 1 = 1';
+    $params = [];
 
-        if (!empty($filters['academic_year_id'])) {
-            $sql .= ' AND e.academic_year_id = :academic_year_id';
-            $params[':academic_year_id'] = (int) $filters['academic_year_id'];
-        }
-
-        if (!empty($filters['term_id'])) {
-            $sql .= ' AND e.term_id = :term_id';
-            $params[':term_id'] = (int) $filters['term_id'];
-        }
-
-        if (!empty($filters['class_id'])) {
-            $sql .= ' AND s.class_id = :class_id';
-            $params[':class_id'] = (int) $filters['class_id'];
-        }
-
-        $sql .= ' GROUP BY s.id, u.full_name, s.admission_number, c.class_name, ay.year_name
-                  ORDER BY u.full_name ASC';
-
-        $stmt = Database::query($sql, $params);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        foreach ($rows as &$row) {
-            $row['overall_percentage'] = ((float) $row['total_possible'] > 0)
-                ? (((float) $row['total_obtained'] / (float) $row['total_possible']) * 100)
-                : 0;
-            $row['overall_grade'] = Result::gradeFromPercentage((float) $row['overall_percentage']);
-            $row['overall_remark'] = Result::remarkFromGrade($row['overall_grade']);
-        }
-
-        return $rows;
+    if (!empty($filters['academic_year_id'])) {
+        $sql .= ' AND e.academic_year_id = :academic_year_id';
+        $params[':academic_year_id'] = (int) $filters['academic_year_id'];
     }
 
+    if (!empty($filters['term_id'])) {
+        $sql .= ' AND e.term_id = :term_id';
+        $params[':term_id'] = (int) $filters['term_id'];
+    }
+
+    if (!empty($filters['class_id'])) {
+        $sql .= ' AND s.class_id = :class_id';
+        $params[':class_id'] = (int) $filters['class_id'];
+    }
+
+    $sql .= ' GROUP BY s.id, u.full_name, s.admission_number, c.class_name, ay.year_name
+              ORDER BY u.full_name ASC';
+
+    $stmt = Database::query($sql, $params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($rows as &$row) {
+        $row['overall_percentage'] = ((float) $row['total_possible'] > 0)
+            ? (((float) $row['total_obtained'] / (float) $row['total_possible']) * 100)
+            : 0;
+        $row['overall_grade'] = Result::gradeFromPercentage((float) $row['overall_percentage']);
+        $row['overall_remark'] = Result::remarkFromGrade($row['overall_grade']);
+    }
+
+    return $rows;
+}
     private function academicOverview(array $filters)
     {
         $rows = $this->academicStudentSummary($filters);

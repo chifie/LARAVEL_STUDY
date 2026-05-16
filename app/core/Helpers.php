@@ -197,3 +197,55 @@ function view($view, array $data = [])
     extract($data, EXTR_SKIP);
     require $viewFile;
 }
+
+function render_view($view, array $data = [])
+{
+    ob_start();
+    view($view, $data);
+    return ob_get_clean();
+}
+
+function partial($view, array $data = [])
+{
+    echo render_view($view, $data);
+}
+
+function current_page($default = '')
+{
+    return trim((string) ($_GET['page'] ?? $default));
+}
+
+function route_is($target, $current = null)
+{
+    $current = $current === null ? current_page() : (string) $current;
+    return $current === (string) $target;
+}
+
+function route_starts_with($prefix, $current = null)
+{
+    $current = $current === null ? current_page() : (string) $current;
+    $prefix = (string) $prefix;
+
+    if ($prefix === '') {
+        return true;
+    }
+
+    return strpos($current, $prefix) === 0;
+}
+
+function nav_active($target, $current = null, $prefix = false)
+{
+    return $prefix ? (route_starts_with($target, $current) ? 'active' : '') : (route_is($target, $current) ? 'active' : '');
+}
+
+function role_label_text($role)
+{
+    $roles = app_config('roles', []);
+    $role = (string) $role;
+
+    if (isset($roles[$role])) {
+        return $roles[$role];
+    }
+
+    return ucfirst(str_replace('_', ' ', $role));
+}

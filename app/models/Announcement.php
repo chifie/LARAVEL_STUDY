@@ -12,7 +12,9 @@ class Announcement
              LEFT JOIN classes c ON c.id = a.class_id
              WHERE a.id = :id
              LIMIT 1',
-            [':id' => (int) $id]
+            [
+                ':id' => (int) $id,
+            ]
         );
 
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -24,7 +26,10 @@ class Announcement
     {
         $stmt = Database::query(
             'SELECT a.*, u.full_name AS creator_name, c.class_name,
-                    (SELECT COUNT(*) FROM notifications n WHERE n.type = "announcement" AND n.title = a.title) AS notification_count
+                    (SELECT COUNT(*)
+                     FROM notifications n
+                     WHERE n.type = "announcement"
+                       AND n.title = a.title) AS notification_count
              FROM announcements a
              LEFT JOIN users u ON u.id = a.created_by
              LEFT JOIN classes c ON c.id = a.class_id
@@ -42,11 +47,11 @@ class Announcement
              VALUES
                 (:title, :message, :audience, :class_id, :created_by, :is_published, :published_at, NOW(), NOW())',
             [
-                ':title' => trim((string) $data['title']),
-                ':message' => trim((string) $data['message']),
-                ':audience' => $data['audience'],
+                ':title' => trim((string) ($data['title'] ?? '')),
+                ':message' => trim((string) ($data['message'] ?? '')),
+                ':audience' => (string) ($data['audience'] ?? 'all'),
                 ':class_id' => !empty($data['class_id']) ? (int) $data['class_id'] : null,
-                ':created_by' => (int) $data['created_by'],
+                ':created_by' => !empty($data['created_by']) ? (int) $data['created_by'] : null,
                 ':is_published' => !empty($data['is_published']) ? 1 : 0,
                 ':published_at' => !empty($data['is_published']) ? date('Y-m-d H:i:s') : null,
             ]
@@ -72,7 +77,9 @@ class Announcement
                  published_at = NOW(),
                  updated_at = NOW()
              WHERE id = :id',
-            [':id' => (int) $id]
+            [
+                ':id' => (int) $id,
+            ]
         );
 
         return self::find($id);
@@ -94,12 +101,14 @@ class Announcement
 
     public static function visibleForUser(array $user)
     {
-        if (($user['role'] ?? '') === 'super_admin') {
+        $role = (string) ($user['role'] ?? '');
+
+        if ($role === 'super_admin') {
             return self::activePublished();
         }
 
-        if (($user['role'] ?? '') === 'teacher') {
-            $teacher = Teacher::findByUserId($user['id']);
+        if ($role === 'teacher') {
+            $teacher = Teacher::findByUserId((int) ($user['id'] ?? 0));
             if (!$teacher) {
                 return [];
             }
@@ -109,22 +118,34 @@ class Announcement
                  FROM announcements a
                  LEFT JOIN users u ON u.id = a.created_by
                  LEFT JOIN classes c ON c.id = a.class_id
-                 LEFT JOIN class_subjects cs ON cs.class_id = a.class_id AND cs.teacher_id = :teacher_id
+                 LEFT JOIN class_subjects cs
+                    ON cs.class_id = a.class_id
+                   AND cs.teacher_id = :teacher_id_join
                  WHERE a.is_published = 1
                    AND (
                         a.audience = "all"
                         OR a.audience = "teachers"
-                        OR (a.audience = "class" AND (a.class_id IS NOT NULL AND (cs.teacher_id IS NOT NULL OR c.class_teacher_id = :teacher_id)))
+                        OR (
+                            a.audience = "class"
+                            AND a.class_id IS NOT NULL
+                            AND (
+                                cs.teacher_id IS NOT NULL
+                                OR c.class_teacher_id = :teacher_id_class
+                            )
+                        )
                    )
                  ORDER BY a.published_at DESC, a.id DESC',
-                [':teacher_id' => (int) $teacher['id']]
+                [
+                    ':teacher_id_join' => (int) $teacher['id'],
+                    ':teacher_id_class' => (int) $teacher['id'],
+                ]
             );
 
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        if (($user['role'] ?? '') === 'student') {
-            $student = Student::findByUserId($user['id']);
+        if ($role === 'student') {
+            $student = Student::findByUserId((int) ($user['id'] ?? 0));
             if (!$student) {
                 return [];
             }
@@ -141,7 +162,9 @@ class Announcement
                         OR (a.audience = "class" AND a.class_id = :class_id)
                    )
                  ORDER BY a.published_at DESC, a.id DESC',
-                [':class_id' => (int) $student['class_id']]
+                [
+                    ':class_id' => (int) ($student['class_id'] ?? 0),
+                ]
             );
 
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -152,7 +175,7 @@ class Announcement
 
     public static function recipientUserIds(array $announcement)
     {
-        $audience = $announcement['audience'];
+        $audience = (string) ($announcement['audience'] ?? '');
         $classId = !empty($announcement['class_id']) ? (int) $announcement['class_id'] : null;
 
         if ($audience === 'all') {
@@ -164,7 +187,8 @@ class Announcement
             $stmt = Database::query(
                 'SELECT u.id
                  FROM users u
-                 WHERE u.role = "teacher" AND u.is_active = 1'
+                 WHERE u.role = "teacher"
+                   AND u.is_active = 1'
             );
             return array_map('intval', array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'id'));
         }
@@ -173,7 +197,8 @@ class Announcement
             $stmt = Database::query(
                 'SELECT u.id
                  FROM users u
-                 WHERE u.role = "student" AND u.is_active = 1'
+                 WHERE u.role = "student"
+                   AND u.is_active = 1'
             );
             return array_map('intval', array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'id'));
         }
@@ -185,8 +210,11 @@ class Announcement
                 'SELECT u.id
                  FROM students s
                  INNER JOIN users u ON u.id = s.user_id
-                 WHERE s.class_id = :class_id AND u.is_active = 1',
-                [':class_id' => $classId]
+                 WHERE s.class_id = :class_id
+                   AND u.is_active = 1',
+                [
+                    ':class_id' => $classId,
+                ]
             )->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($students as $row) {
@@ -198,8 +226,11 @@ class Announcement
                  FROM classes c
                  INNER JOIN teachers t ON t.id = c.class_teacher_id
                  INNER JOIN users u ON u.id = t.user_id
-                 WHERE c.id = :class_id AND u.is_active = 1',
-                [':class_id' => $classId]
+                 WHERE c.id = :class_id
+                   AND u.is_active = 1',
+                [
+                    ':class_id' => $classId,
+                ]
             )->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($classTeacher as $row) {
@@ -211,8 +242,11 @@ class Announcement
                  FROM class_subjects cs
                  INNER JOIN teachers t ON t.id = cs.teacher_id
                  INNER JOIN users u ON u.id = t.user_id
-                 WHERE cs.class_id = :class_id AND u.is_active = 1',
-                [':class_id' => $classId]
+                 WHERE cs.class_id = :class_id
+                   AND u.is_active = 1',
+                [
+                    ':class_id' => $classId,
+                ]
             )->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($subjectTeachers as $row) {

@@ -15,9 +15,12 @@ class Attendance
              LEFT JOIN teachers t2 ON t2.id = cs.teacher_id
              LEFT JOIN users tu ON tu.id = t2.user_id
              WHERE c.status = "active"
-               AND (cu.id = :user_id OR tu.id = :user_id)
+               AND (cu.id = :user_id_1 OR tu.id = :user_id_2)
              ORDER BY c.class_name ASC',
-            [':user_id' => (int) $userId]
+            [
+                ':user_id_1' => (int) $userId,
+                ':user_id_2' => (int) $userId,
+            ]
         );
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -47,7 +50,9 @@ class Attendance
                AND s.status = "active"
                AND u.is_active = 1
              ORDER BY u.full_name ASC',
-            [':class_id' => (int) $classId]
+            [
+                ':class_id' => (int) $classId,
+            ]
         );
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -94,7 +99,11 @@ class Attendance
             }
 
             $existing = Database::query(
-                'SELECT id FROM attendance WHERE student_id = :student_id AND attendance_date = :attendance_date LIMIT 1',
+                'SELECT id
+                 FROM attendance
+                 WHERE student_id = :student_id
+                   AND attendance_date = :attendance_date
+                 LIMIT 1',
                 [
                     ':student_id' => $studentId,
                     ':attendance_date' => $attendanceDate,
@@ -205,15 +214,16 @@ class Attendance
              INNER JOIN users u ON u.id = s.user_id
              LEFT JOIN attendance a
                ON a.student_id = s.id
-              AND a.class_id = :class_id
+              AND a.class_id = :class_id_1
               AND a.attendance_date BETWEEN :from_date AND :to_date
-             WHERE s.class_id = :class_id
+             WHERE s.class_id = :class_id_2
                AND s.status = "active"
                AND u.is_active = 1
              GROUP BY s.id, s.admission_number, u.full_name
              ORDER BY u.full_name ASC',
             [
-                ':class_id' => (int) $classId,
+                ':class_id_1' => (int) $classId,
+                ':class_id_2' => (int) $classId,
                 ':from_date' => $fromDate,
                 ':to_date' => $toDate,
             ]
@@ -230,7 +240,9 @@ class Attendance
              INNER JOIN academic_years ay ON ay.id = c.academic_year_id
              WHERE c.id = :id
              LIMIT 1',
-            [':id' => (int) $classId]
+            [
+                ':id' => (int) $classId,
+            ]
         );
 
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
