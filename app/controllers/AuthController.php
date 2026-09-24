@@ -127,6 +127,6 @@ class AuthController
 
     public function dashboard()
     {
-        Response::redirect(Auth::dashboardUrl());
+        Response::redirect(Auth::dashboardUrl())
     }
 }
